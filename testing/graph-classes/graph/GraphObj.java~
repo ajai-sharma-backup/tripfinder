@@ -1,0 +1,242 @@
+package graph;
+
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.HashMap;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Collections;
+
+/* See restrictions in Graph.java. */
+
+/** A partial implementation of Graph containing elements common to
+ *  directed and undirected graphs.
+ *
+ *  @author T. C. Drake
+ */
+abstract class GraphObj extends Graph {
+
+    /** A new, empty Graph. */
+    GraphObj() {
+        _edgesSet = new HashSet<int[]>();
+        adjacencyLists =
+            new HashMap<Integer, ArrayList<ArrayList<Integer>>>();
+    }
+
+    @Override
+    public int vertexSize() {
+        return verticesSet().size();
+    }
+
+    @Override
+    public int maxVertex() {
+        if (vertexSize() == 0) {
+            return 0;
+        }
+        return Collections.max(verticesSet());
+    }
+
+    @Override
+    public int edgeSize() {
+        return _edgesSet.size();
+    }
+
+    @Override
+    public abstract boolean isDirected();
+
+    @Override
+    public int outDegree(int v) {
+        return successorsList(v).size();
+    }
+
+    @Override
+    public int inDegree(int v) {
+        return predecessorsList(v).size();
+    }
+
+    @Override
+    public boolean contains(int u) {
+        return verticesSet().contains(u);
+    }
+
+    @Override
+    public boolean contains(int u, int v) {
+        if (successorsList(u) == null) {
+            return false;
+        }
+        return successorsList(u).contains(v);
+    }
+
+    @Override
+    public abstract int add();
+
+    @Override
+    public int add(int u, int v) {
+        if (!contains(u) || !contains(v)) {
+            return 0;
+        }
+        if (contains(u, v)) {
+            return 0;
+        }
+        successorsList(u).add(v);
+        if (isDirected() || u != v) {
+            predecessorsList(v).add(u);
+        }
+        _edgesSet.add(new int[] {u, v});
+        return u;
+    }
+
+    @Override
+    public void remove(int v) {
+        if (!contains(v)) {
+            return;
+        }
+        LinkedList<Integer> todo = new LinkedList<Integer>();
+        for (int p : predecessors(v)) {
+            todo.add(p);
+        }
+        for (int p : todo) {
+            remove(p, v);
+        }
+        todo.clear();
+        for (int s : successors(v)) {
+            todo.add(s);
+        }
+        for (int s: todo) {
+            remove(v, s);
+        }
+        adjacencyLists.remove(v);
+    }
+
+    @Override
+    public void remove(int u, int v) {
+        if (!contains(u, v)) {
+            return;
+        }
+        successorsList(u).removeAll(Collections.singleton(v));
+        predecessorsList(v).removeAll(Collections.singleton(u));
+        LinkedList<int[]> todo = new LinkedList<int[]>();
+        for (int[] i : _edgesSet) {
+            todo.add(i);
+        }
+        for (int[] i : todo) {
+            if (i[0] == u && i[1] == v
+                    || (!isDirected() && i[1] == u && i[0] == v)) {
+                _edgesSet.remove(i);
+            }
+        }
+    }
+
+    @Override
+    public Iteration<Integer> vertices() {
+        return Iteration.iteration(adjacencyLists.keySet());
+    }
+
+    @Override
+    public int successor(int v, int k) {
+        if (!mine(v) || k >= successorsList(v).size()) {
+            return 0;
+        }
+        return successorsList(v).get(k);
+    }
+
+    @Override
+    public int predecessor(int v, int k) {
+        if (!mine(v) || k >= predecessorsList(v).size()) {
+            return 0;
+        }
+        return predecessorsList(v).get(k);
+    }
+
+    @Override
+    public Iteration<Integer> successors(int v) {
+        if (adjacencyLists.get(v) == null) {
+            return Iteration.iteration(new LinkedList<Integer>());
+        }
+        return Iteration.iteration(successorsList(v));
+    }
+
+    /** Returns the successors of V in a LinkedList. */
+    private ArrayList<Integer> successorsList(int v) {
+        if (adjacencyLists.get(v) == null) {
+            return new ArrayList<Integer>();
+        }
+        return adjacencyLists.get(v).get(0);
+    }
+
+    @Override
+    public Iteration<Integer> predecessors(int v) {
+        if (adjacencyLists.get(v) == null) {
+            return Iteration.iteration(new LinkedList<Integer>());
+        }
+        return Iteration.iteration(predecessorsList(v));
+    }
+
+
+    /** Returns the predecessors of V in a LinkedList. */
+    private ArrayList<Integer> predecessorsList(int v) {
+        if (adjacencyLists.get(v) == null) {
+            return new ArrayList<Integer>();
+        }
+        return adjacencyLists.get(v).get(1);
+    }
+
+    /** Returns a set containing the vertices of this graph. */
+    Set<Integer> verticesSet() {
+        return adjacencyLists.keySet();
+    }
+
+    @Override
+    public Iteration<int[]> edges() {
+        return Iteration.iteration(_edgesSet);
+    }
+
+    @Override
+    protected boolean mine(int v) {
+        return contains(v);
+    }
+
+    @Override
+    protected void checkMyVertex(int v) {
+        String message = "this graph does not contain a vertex with number ";
+        if (!mine(v)) {
+            throw new IllegalArgumentException(message + v);
+        }
+    }
+
+    @Override
+    protected int edgeId(int u, int v) {
+        /* Cantor pairing function. */
+        u -= 1;
+        v -= 1;
+        return (u + v) * (u + v + 1) / 2 + v;
+    }
+
+    /** HashSet containing the edges of the graph in array form. */
+    private HashSet<int[]> _edgesSet;
+
+    /** Returns a mapping from vertices to an LinkedList containing
+     *  a LinkedList of successors at index 0 and a LinkedList
+     *  of predecessors at index 1. These are identical (point to
+     *  the same object) for an undirected graph. */
+    private HashMap<Integer, ArrayList<ArrayList<Integer>>> adjacencyLists;
+
+    /** Accessor method for adjacencyLists; returns that. */
+    HashMap<Integer, ArrayList<ArrayList<Integer>>> adjacencyLists() {
+        return adjacencyLists;
+    }
+
+    /** Returns the smallest index that does not have a vertex
+     *  in this graph. */
+    int smallestOpenIndex() {
+        if (vertexSize() == maxVertex()) {
+            return maxVertex() + 1;
+        }
+        for (int i = 1; i <= maxVertex() + 1; i += 1) {
+            if (!verticesSet().contains(i)) {
+                return i;
+            }
+        }
+        return maxVertex() + 1;
+    }
+}
